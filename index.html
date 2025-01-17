@@ -15,32 +15,33 @@
       justify-content: flex-start;
       min-height: 100vh;
       background-color: #f9f9f9;
-      position: relative;
     }
-
-    /* Position the alert message fixed at the top */
-    .alert-message {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #007bff;
-      color: white;
-      padding: 10px;
+    form, button {
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 300px;
+    }
+    form label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    form input, form select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
       border-radius: 4px;
-      margin: 10px 0;
-      display: none;
-      z-index: 1000;
+      box-sizing: border-box;
     }
-
-    /* Style for location dropdown */
     .searchable-select {
       position: relative;
       width: 100%;
-      max-width: 300px;
-      margin-top: 20px;
     }
-
     .searchable-select input {
       width: 100%;
       padding: 8px;
@@ -48,7 +49,6 @@
       border-radius: 4px;
       box-sizing: border-box;
     }
-
     .searchable-select ul {
       list-style: none;
       margin: 0;
@@ -62,43 +62,13 @@
       background: #fff;
       z-index: 10;
     }
-
     .searchable-select ul li {
       padding: 8px;
       cursor: pointer;
     }
-
     .searchable-select ul li:hover {
       background-color: #f0f0f0;
     }
-
-    /* Style for form elements */
-    form {
-      background: #fff;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      width: 100%;
-      max-width: 300px;
-      margin-top: 80px; /* To prevent overlap with the dropdown */
-    }
-
-    form label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-
-    form input, form select {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-sizing: border-box;
-    }
-
     button {
       width: 100%;
       padding: 10px;
@@ -109,12 +79,12 @@
       border: none;
       border-radius: 4px;
     }
-
     button:hover {
       background-color: #0056b3;
     }
-
-    /* Product list style */
+    #downloadExcel {
+      margin-top: 10px;
+    }
     #productList {
       margin-top: 20px;
       width: 100%;
@@ -125,17 +95,14 @@
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
-
     #productList h2 {
       margin-top: 0;
     }
-
     #productList ul {
       list-style: none;
       padding: 0;
       margin: 0;
     }
-
     #productList ul li {
       display: flex;
       justify-content: space-between;
@@ -143,11 +110,9 @@
       padding: 8px;
       border-bottom: 1px solid #ccc;
     }
-
     #productList ul li:last-child {
       border-bottom: none;
     }
-
     .delete-btn, .edit-btn {
       background-color: #dc3545;
       color: white;
@@ -159,21 +124,16 @@
       font-size: 14px;
       width: 60px;
     }
-
     .delete-btn:hover {
       background-color: #a71d2a;
     }
-
     .edit-btn {
       background-color: #ffc107;
       color: white;
     }
-
     .edit-btn:hover {
       background-color: #e0a800;
     }
-
-    /* Container for action buttons */
     .buttons-container {
       display: flex;
       flex-direction: column;
@@ -182,11 +142,9 @@
       max-width: 300px;
       margin-top: 20px;
     }
-
     #finalizeLocation {
       margin-bottom: 10px;
     }
-
     #locationTotal, #overallTotal {
       margin-top: 20px;
       font-weight: bold;
@@ -194,11 +152,7 @@
   </style>
 </head>
 <body>
-  <!-- Alert message -->
-  <div class="alert-message" id="alertMessage"></div>
-
   <h1>Stock Take App</h1>
-
   <form id="stockForm">
     <label for="location">Location:</label>
     <div class="searchable-select">
@@ -246,7 +200,6 @@
     const locationName = document.getElementById('locationName');
     const locationTotal = document.getElementById('locationTotal');
     const overallTotal = document.getElementById('overallTotal');
-    const alertMessage = document.getElementById('alertMessage');
 
     let selectedLocation = null;
     let products = [];
@@ -293,7 +246,7 @@
       e.preventDefault();
 
       if (!selectedLocation) {
-        showAlert('Please select a location.');
+        alert('Please select a location.');
         return;
       }
 
@@ -322,64 +275,81 @@
       }
       locationQuantities[selectedLocation][data.sku] += data.quantity;
 
-      // Reset form fields
-      form.sku.value = '';
-      form.quantity.value = '';
+      alert(`Product added for location: ${selectedLocation}`);
 
       // Update product list
       updateProductList();
 
-      // Show success message
-      showAlert('Product added successfully.');
+      // Clear form inputs (except location)
+      form.sku.value = '';
+      form.quantity.value = '';
     });
 
-    // Update product list display
-    function updateProductList() {
-      if (!selectedLocation) return;
+    // Handle edit action for a specific entry
+    function editProduct(sku, index) {
+      const product = products[index];
+      const newQuantity = prompt(`Enter new quantity for SKU ${sku} (Current quantity: ${product.quantity}):`);
 
-      const locationProducts = products.filter(
-        (product) => product.location === selectedLocation
-      );
+      if (newQuantity && !isNaN(newQuantity) && parseInt(newQuantity) >= 0) {
+        // Update the quantity of the specific product entry
+        product.quantity = parseInt(newQuantity);
 
-      if (locationProducts.length === 0) {
-        productList.style.display = 'none';
-        return;
+        // Recalculate cumulative quantity for the SKU
+        cumulativeQuantities[sku] = products
+          .filter(product => product.sku === sku)
+          .reduce((sum, product) => sum + product.quantity, 0);
+
+        // Recalculate location total
+        locationQuantities[selectedLocation][sku] = products
+          .filter(product => product.location === selectedLocation && product.sku === sku)
+          .reduce((sum, product) => sum + product.quantity, 0);
+
+        // Update the product list display
+        updateProductList();
+      } else {
+        alert('Invalid quantity entered.');
       }
-
-      productList.style.display = 'block';
-      productListItems.innerHTML = '';
-
-      locationProducts.forEach((product) => {
-        const listItem = document.createElement('li');
-        listItem.innerHTML = `
-          ${product.sku}: ${product.quantity}
-          <button class="delete-btn" onclick="deleteProduct('${product.sku}')">Delete</button>
-        `;
-        productListItems.appendChild(listItem);
-      });
-
-      // Update location total
-      const locationTotalValue = locationProducts.reduce(
-        (acc, product) => acc + product.quantity,
-        0
-      );
-      locationTotal.textContent = `Total for this location: ${locationTotalValue}`;
-
-      // Update overall total
-      const overallTotalValue = products.reduce(
-        (acc, product) => acc + product.quantity,
-        0
-      );
-      overallTotal.textContent = `Overall Total: ${overallTotalValue}`;
     }
 
-    // Show alert message
-    function showAlert(message) {
-      alertMessage.textContent = message;
-      alertMessage.style.display = 'block';
-      setTimeout(() => {
-        alertMessage.style.display = 'none';
-      }, 3000);
+    // Update product list display with the updated products and individual edit buttons
+    function updateProductList() {
+      const filteredProducts = products.filter(product => product.location === selectedLocation);
+
+      if (filteredProducts.length > 0) {
+        locationName.textContent = selectedLocation;
+        productListItems.innerHTML = '';
+        
+        // Display products individually with their edit and delete buttons
+        filteredProducts.forEach((product, index) => {
+          const li = document.createElement('li');
+          li.innerHTML = `${product.sku}, Counted: ${product.quantity} (Location Total: ${locationQuantities[selectedLocation][product.sku]})
+            (Overall Total: ${cumulativeQuantities[product.sku]})
+            <button class="edit-btn" onclick="editProduct('${product.sku}', ${index})">Edit</button>
+            <button class="delete-btn" onclick="handleDelete('${product.sku}', ${index})">Delete</button>`;
+          productListItems.appendChild(li);
+        });
+        
+        productList.style.display = 'block';
+      } else {
+        productList.style.display = 'none';
+      }
+    }
+
+    // Handle delete action for a specific entry
+    function handleDelete(sku, index) {
+      // Remove the specific product entry
+      const product = products[index];
+      products.splice(index, 1);
+      
+      // Update cumulative quantity for the SKU
+      cumulativeQuantities[sku] -= product.quantity;
+      
+      // Update location total
+      locationQuantities[product.location][sku] -= product.quantity;
+
+      // Update the product list display
+      updateProductList();
+      alert('Product deleted successfully.');
     }
   </script>
 </body>
