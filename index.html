@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stock Take App</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -145,26 +146,14 @@
     #finalizeLocation {
       margin-bottom: 10px;
     }
-
-    /* Responsive adjustments */
-    @media screen and (max-width: 480px) {
-      body {
-        padding: 10px;
-      }
-
-      form, button, #productList, .buttons-container {
-        width: 100%;
-        max-width: 100%;
-      }
-
-      #productList {
-        margin-top: 10px;
-      }
-    }
   </style>
 </head>
 <body>
   <h1>Stock Take App</h1>
+
+  <!-- Excel file upload -->
+  <input type="file" id="uploadExcel" accept=".xlsx" />
+
   <form id="stockForm">
     <label for="location">Location:</label>
     <div class="searchable-select">
@@ -198,8 +187,6 @@
   </div>
 
   <script>
-    const API_BASE_URL = 'https://your-backend-url'; // Replace with your backend URL
-
     const form = document.getElementById('stockForm');
     const downloadButton = document.getElementById('downloadExcel');
     const finalizeButton = document.getElementById('finalizeLocation');
@@ -212,20 +199,42 @@
     let selectedLocation = null;
     let products = [];
     let cumulativeQuantities = {}; // To store cumulative quantities across all locations
-    let productCatalog = []; // Array to store SKU data from the Excel file
+    let skuData = []; // Array to store SKU data from the uploaded Excel
 
-    // Load the SKU data from Excel
-    fetch('skus.xlsx')
-      .then(response => response.arrayBuffer())
-      .then(data => {
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        productCatalog = XLSX.utils.sheet_to_json(sheet);
-      })
-      .catch(error => {
-        console.error('Error loading SKU data from Excel:', error);
-        alert('Failed to load SKU data from Excel.');
-      });
+    // Handle file upload and parse the Excel data
+    document.getElementById("uploadExcel").addEventListener("change", handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const data = e.target.result;
+
+        // Parse the Excel data
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+
+        // Convert the sheet data into JSON format
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Process SKU data from the Excel sheet
+        parseSkuData(jsonData);
+      };
+
+      reader.readAsBinaryString(file);
+    }
+
+    function parseSkuData(data) {
+      skuData = data.map(row => ({
+        sku: row[0], // SKU column
+        description: row[1], // Description column
+        expectedQuantity: row[2], // Quantity column
+      }));
+      console.log(skuData); // You can see the parsed SKU data in the console
+    }
 
     // Filter dropdown options
     searchableInput.addEventListener('input', () => {
@@ -255,13 +264,6 @@
       }
     });
 
-    // Hide dropdown if clicked outside
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.searchable-select')) {
-        locationDropdown.style.display = 'none';
-      }
-    });
-
     // Handle form submission
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -271,9 +273,18 @@
         return;
       }
 
+      const enteredSku = form.sku.value;
+      const foundSku = skuData.find(sku => sku.sku === enteredSku);
+
+      if (!foundSku) {
+        alert('SKU not found.');
+        return;
+      }
+
       const data = {
         location: selectedLocation,
-        sku: form.sku.value,
+        sku: enteredSku,
+        description: foundSku.description,
         quantity: parseInt(form.quantity.value),
       };
 
@@ -304,92 +315,59 @@
       if (filteredProducts.length > 0) {
         locationName.textContent = selectedLocation;
         productListItems.innerHTML = '';
-        
+
         // Group products by SKU
         const groupedProducts = {};
         filteredProducts.forEach(product => {
           if (!groupedProducts[product.sku]) {
-            groupedProducts[product.sku] = 0;
+            groupedProducts[product.sku] = { ...product, totalQuantity: 0 };
           }
-          groupedProducts[product.sku] += product.quantity;
+          groupedProducts[product.sku].totalQuantity += product.quantity;
         });
 
-        // Display products with total quantity for the same SKU
-        for (const sku in groupedProducts) {
+        Object.values(groupedProducts).forEach(product => {
           const li = document.createElement('li');
-          li.innerHTML = `${sku}, Counted: ${groupedProducts[sku]} (Total: ${cumulativeQuantities[sku]})
-            <button class="edit-btn" onclick="editProduct('${sku}')">Edit</button>
-            <button class="delete-btn" onclick="handleDelete('${sku}')">Delete</button>`;
+          li.innerHTML = `
+            <span>${product.sku} - ${product.description}</span>
+            <span>Quantity: ${product.totalQuantity}</span>
+            <button class="edit-btn" onclick="editProduct('${product.sku}')">Edit</button>
+            <button class="delete-btn" onclick="deleteProduct('${product.sku}')">Delete</button>
+          `;
           productListItems.appendChild(li);
-        }
+        });
 
         productList.style.display = 'block';
-      } else {
-        productList.style.display = 'none';
       }
     }
 
-    // Handle edit action
-    function editProduct(sku) {
-      const newQuantity = prompt(`Enter new quantity for SKU ${sku}:`);
-      if (newQuantity && !isNaN(newQuantity)) {
-        products = products.map(product => {
-          if (product.sku === sku && product.location === selectedLocation) {
-            product.quantity = parseInt(newQuantity);
-          }
-          return product;
-        });
-        
-        // Update cumulative quantity
-        cumulativeQuantities[sku] = products
-          .filter(product => product.sku === sku)
-          .reduce((sum, product) => sum + product.quantity, 0);
-        
-        updateProductList();
-      }
-    }
-
-    // Handle delete action
-    function handleDelete(sku) {
-      products = products.filter(product => product.sku !== sku || product.location !== selectedLocation);
-      delete cumulativeQuantities[sku]; // Remove cumulative quantity for deleted SKU
-      alert('Product deleted successfully.');
+    // Delete product
+    function deleteProduct(sku) {
+      products = products.filter(product => product.sku !== sku);
       updateProductList();
     }
 
-    // Finalize location and reset for new one
-    finalizeButton.addEventListener('click', async () => {
-      if (!selectedLocation) {
-        alert('No location selected to finalize.');
+    // Edit product (not yet implemented)
+    function editProduct(sku) {
+      alert(`Editing product with SKU: ${sku}`);
+    }
+
+    // Finalize location
+    finalizeButton.addEventListener('click', () => {
+      if (products.length === 0) {
+        alert('No products to finalize.');
         return;
       }
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/add_stock`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(products),
-        });
-
-        const result = await response.json();
-        alert(result.message || result.error);
-
-        // Reset state
-        selectedLocation = null;
-        products = [];
-        cumulativeQuantities = {};
-        searchableInput.value = '';
-        form.reset();
-        productList.style.display = 'none';
-      } catch (error) {
-        console.error('Error finalizing location:', error);
-        alert('An error occurred while finalizing the location.');
-      }
+      alert(`Location ${selectedLocation} finalized.`);
+      products = []; // Reset the product list
+      updateProductList(); // Clear the displayed product list
     });
 
-    // Download Excel file
+    // Download Excel
     downloadButton.addEventListener('click', () => {
-      window.location.href = `${API_BASE_URL}/download_excel`;
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(products);
+      XLSX.utils.book_append_sheet(wb, ws, 'Products');
+      XLSX.writeFile(wb, 'stock_take.xlsx');
     });
   </script>
 </body>
