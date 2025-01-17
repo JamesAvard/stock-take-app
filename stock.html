@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Take App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f9f9f9;
+    }
+    form, button {
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    form label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    form input, form select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .searchable-select {
+      position: relative;
+      width: 100%;
+    }
+    .searchable-select input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .searchable-select ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      position: absolute;
+      width: 100%;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-top: none;
+      background: #fff;
+      z-index: 10;
+    }
+    .searchable-select ul li {
+      padding: 8px;
+      cursor: pointer;
+    }
+    .searchable-select ul li:hover {
+      background-color: #f0f0f0;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #downloadExcel {
+      margin-top: 10px;
+    }
+    #productList {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    #productList h2 {
+      margin-top: 0;
+    }
+    #productList ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    #productList ul li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      border-bottom: 1px solid #ccc;
+    }
+    #productList ul li:last-child {
+      border-bottom: none;
+    }
+    .delete-btn, .edit-btn {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 5px;
+      margin-left: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 60px;
+    }
+    .delete-btn:hover {
+      background-color: #a71d2a;
+    }
+    .edit-btn {
+      background-color: #ffc107;
+      color: white;
+    }
+    .edit-btn:hover {
+      background-color: #e0a800;
+    }
+    .buttons-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 400px;
+      margin-top: 20px;
+    }
+    #finalizeLocation {
+      margin-bottom: 10px;
+    }
+
+    /* Responsive adjustments */
+    @media screen and (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+
+      form, button, #productList, .buttons-container {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      #productList {
+        margin-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Stock Take App</h1>
+  <form id="stockForm">
+    <label for="location">Location:</label>
+    <div class="searchable-select">
+      <input type="text" id="searchableInput" placeholder="Search or select a location">
+      <ul id="locationDropdown">
+        <li data-value="Warehouse">Warehouse</li>
+        <li data-value="Aisle 1">Aisle 1</li>
+        <li data-value="Aisle 2">Aisle 2</li>
+        <li data-value="Aisle 3">Aisle 3</li>
+        <li data-value="Backroom">Backroom</li>
+      </ul>
+    </div>
+
+    <label for="sku">SKU:</label>
+    <input type="text" id="sku" name="sku" placeholder="Enter product SKU" required>
+
+    <label for="quantity">Quantity:</label>
+    <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" required>
+
+    <button type="submit">Add Product</button>
+  </form>
+
+  <div id="productList" style="display: none;">
+    <h2>Products for <span id="locationName"></span>:</h2>
+    <ul id="productListItems"></ul>
+  </div>
+
+  <div class="buttons-container">
+    <button id="finalizeLocation">Finalize Location</button>
+    <button id="downloadExcel">Download Excel</button>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'https://your-backend-url'; // Replace with your backend URL
+
+    const form = document.getElementById('stockForm');
+    const downloadButton = document.getElementById('downloadExcel');
+    const finalizeButton = document.getElementById('finalizeLocation');
+    const searchableInput = document.getElementById('searchableInput');
+    const locationDropdown = document.getElementById('locationDropdown');
+    const productList = document.getElementById('productList');
+    const productListItems = document.getElementById('productListItems');
+    const locationName = document.getElementById('locationName');
+
+    let selectedLocation = null;
+    let products = [];
+    let cumulativeQuantities = {}; // To store cumulative quantities across all locations
+    let productCatalog = []; // Array to store SKU data from the Excel file
+
+    // Load the SKU data from Excel
+    fetch('skus.xlsx')
+      .then(response => response.arrayBuffer())
+      .then(data => {
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        productCatalog = XLSX.utils.sheet_to_json(sheet);
+      })
+      .catch(error => {
+        console.error('Error loading SKU data from Excel:', error);
+        alert('Failed to load SKU data from Excel.');
+      });
+
+    // Filter dropdown options
+    searchableInput.addEventListener('input', () => {
+      const filter = searchableInput.value.toLowerCase();
+      const items = locationDropdown.querySelectorAll('li');
+      items.forEach((item) => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(filter) ? 'block' : 'none';
+      });
+      locationDropdown.style.display = 'block';
+    });
+
+    // Show dropdown on input click
+    searchableInput.addEventListener('click', () => {
+      locationDropdown.style.display = 'block';
+    });
+
+    // Handle location selection
+    locationDropdown.addEventListener('click', (e) => {
+      if (e.target.tagName === 'LI') {
+        selectedLocation = e.target.getAttribute('data-value');
+        searchableInput.value = selectedLocation;
+        locationDropdown.style.display = 'none';
+
+        // Update product list
+        updateProductList();
+      }
+    });
+
+    // Hide dropdown if clicked outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.searchable-select')) {
+        locationDropdown.style.display = 'none';
+      }
+    });
+
+    // Handle form submission
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      if (!selectedLocation) {
+        alert('Please select a location.');
+        return;
+      }
+
+      const data = {
+        location: selectedLocation,
+        sku: form.sku.value,
+        quantity: parseInt(form.quantity.value),
+      };
+
+      // Add product to the list
+      products.push(data);
+
+      // Update cumulative quantities
+      if (cumulativeQuantities[data.sku]) {
+        cumulativeQuantities[data.sku] += data.quantity;
+      } else {
+        cumulativeQuantities[data.sku] = data.quantity;
+      }
+
+      alert(`Product added for location: ${selectedLocation}`);
+
+      // Update product list
+      updateProductList();
+
+      // Clear form inputs (except location)
+      form.sku.value = '';
+      form.quantity.value = '';
+    });
+
+    // Update product list display
+    function updateProductList() {
+      const filteredProducts = products.filter(product => product.location === selectedLocation);
+
+      if (filteredProducts.length > 0) {
+        locationName.textContent = selectedLocation;
+        productListItems.innerHTML = '';
+        
+        // Group products by SKU
+        const groupedProducts = {};
+        filteredProducts.forEach(product => {
+          if (!groupedProducts[product.sku]) {
+            groupedProducts[product.sku] = 0;
+          }
+          groupedProducts[product.sku] += product.quantity;
+        });
+
+        // Display products with total quantity for the same SKU
+        for (const sku in groupedProducts) {
+          const li = document.createElement('li');
+          li.innerHTML = `${sku}, Counted: ${groupedProducts[sku]} (Total: ${cumulativeQuantities[sku]})
+            <button class="edit-btn" onclick="editProduct('${sku}')">Edit</button>
+            <button class="delete-btn" onclick="handleDelete('${sku}')">Delete</button>`;
+          productListItems.appendChild(li);
+        }
+
+        productList.style.display = 'block';
+      } else {
+        productList.style.display = 'none';
+      }
+    }
+
+    // Handle edit action
+    function editProduct(sku) {
+      const newQuantity = prompt(`Enter new quantity for SKU ${sku}:`);
+      if (newQuantity && !isNaN(newQuantity)) {
+        products = products.map(product => {
+          if (product.sku === sku && product.location === selectedLocation) {
+            product.quantity = parseInt(newQuantity);
+          }
+          return product;
+        });
+        
+        // Update cumulative quantity
+        cumulativeQuantities[sku] = products
+          .filter(product => product.sku === sku)
+          .reduce((sum, product) => sum + product.quantity, 0);
+        
+        updateProductList();
+      }
+    }
+
+    // Handle delete action
+    function handleDelete(sku) {
+      products = products.filter(product => product.sku !== sku || product.location !== selectedLocation);
+      delete cumulativeQuantities[sku]; // Remove cumulative quantity for deleted SKU
+      alert('Product deleted successfully.');
+      updateProductList();
+    }
+
+    // Finalize location and reset for new one
+    finalizeButton.addEventListener('click', async () => {
+      if (!selectedLocation) {
+        alert('No location selected to finalize.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/add_stock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(products),
+        });
+
+        const result = await response.json();
+        alert(result.message || result.error);
+
+        // Reset state
+        selectedLocation = null;
+        products = [];
+        cumulativeQuantities = {};
+        searchableInput.value = '';
+        form.reset();
+        productList.style.display = 'none';
+      } catch (error) {
+        console.error('Error finalizing location:', error);
+        alert('An error occurred while finalizing the location.');
+      }
+    });
+
+    // Download Excel file
+    downloadButton.addEventListener('click', () => {
+      window.location.href = `${API_BASE_URL}/download_excel`;
+    });
+  </script>
+</body>
+</html>
